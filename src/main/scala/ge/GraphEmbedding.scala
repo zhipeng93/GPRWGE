@@ -11,7 +11,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.internal.Logging
 import models._
 import org.apache.spark.broadcast.Broadcast
-import utils._
+import utils.{HashMapModel, PairsDataset, _}
 
 
 class GraphEmbedding(val params: Map[String, String]) extends Serializable with Logging {
@@ -88,12 +88,12 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 		/* re-organize and shuffle the training data according to the source Meta */
 		// should use the block-SGD.
 		// Now it is wrong since different workers may conflict on the dst vectors.
-		// multiple elements in each partition.
-		val dataRDDForJoin: RDD[(Int, PairsDataset)] = batchData.mapPartitions(iter => {
+		// one element in each partition.
+		val dataRDDForJoin: RDD[(Int, PairsDataset)] = batchData.mapPartitions( iter => {
 			// one batch contains only one PairsDataset
-			val data: PairsDataset = iter.next()
-			val dSrc = data.src
-			val dDst = data.dst
+			val pairsDataset = iter.next()
+			val dSrc = pairsDataset.src
+			val dDst = pairsDataset.dst
 			val srcMeta: Array[Int] = bcMeta.value.srcMeta
 			val arraySrc: Array[ArrayBuffer[Int]] = Array.ofDim(numPartititions)
 			val arrayDst: Array[ArrayBuffer[Int]] = Array.ofDim(numPartititions)
@@ -106,10 +106,9 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 				arraySrc(pid) += dSrc(i)
 				arrayDst(pid) += dDst(i)
 			}
-			arrayDst(0).size
 			val zipped: Array[((ArrayBuffer[Int], ArrayBuffer[Int]), Int)] = arraySrc.zip(arrayDst).zipWithIndex
-			zipped.map(x => (x._2, PairsDataset(x._1._1.toArray, x._1._2.toArray))).toIterator
-		})
+			zipped.map(x => (x._2, new PairsDataset(x._1._1, x._1._2))).toIterator
+		}).reduceByKey((x, y) => x.merge(y))
 
 		/* shared negative sampling */
 		// first generate the negativeIDs on the driver,
@@ -139,15 +138,22 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 			modelRDD.sparkContext.broadcast(negDstModel.map(x => x._2))
 
 		val dataPlusSrcModel: RDD[(Int, (PairsDataset, (HashMapModel, HashMapModel)))] =
-			dataRDDForJoin.join(modelRDD)
-
+			dataRDDForJoin.zipPartitions(modelRDD)(
+				(iter1, iter2) => {
+					// one element in each partition of dataRDDForJoin
+					// one element in each partition of modelRDD
+					val data = iter1.next()
+					val model = iter2.next()
+					Iterator.single((data._1, (data._2, model._2)))
+				}
+			)
 
 		// shuffle the dst embeddings, according to the meta data
 		// if the dstModelVec is already in the partition, then no shuffle is needed.
 
-		val dstModelForJoin: RDD[(Int, HashMapModel)] = dataPlusSrcModel.map(x => {
-			// multiple elements in each partition.
-			val (pid, (pairsDataset, (srcModel, dstModel))) = x
+		val dstModelForJoin: RDD[(Int, HashMapModel)] = dataPlusSrcModel.mapPartitions(x => {
+			// one elements in each partition.
+			val (pid, (pairsDataset, (srcModel, dstModel))) = x.next()
 
 			val dDst = pairsDataset.dst
 			val dstMeta: Array[Int] = bcMeta.value.dstMeta
@@ -164,13 +170,15 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 				}
 			}
 			arrayDstModel.zipWithIndex.map(x => (x._2, x._1)).toIterator
-		}).flatMap(x => x)
+		}).reduceByKey((x, y) => x.merge(y))
 
 		// train the model
 		// val (batchLoss, dstUpdate, batchCnt): (Float, Int, RDD[(Int, HashMapModel)]) = dataPlusSrcModel
 		val tmp: RDD[(Float, Array[Array[Float]], Int, HashMapModel)] = dataPlusSrcModel
-			.join(dstModelForJoin).map(x => {
-			val (pid, ((pairsTrainset, (srcModel, dstModel)), netDstModel)) = x
+			.zipPartitions(dstModelForJoin)((iter1, iter2) =>{
+			val (pid, (pairsTrainset, (srcModel, dstModel))) = iter1.next()
+			val (pid2, netDstModel) = iter2.next()
+			assert(pid == pid2)
 			// the update on the negative samples happens on negative samples.
 			// we need to collect them.
 			val negativeSamplesModel: Array[Array[Float]] = bcNegDstModel.value
@@ -195,7 +203,7 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 				loss += trainOnePair(srcVec, dstVec, negativeSamplesModel, negUpdate)
 			}
 			Iterator.single((loss, negUpdate, srcIds.length, netDstModel))
-		}).flatMap(x => x)
+		})
 
 		// deal with the loss
 		val (batchLoss, negUpdate, batchCnt): (Float, Array[Array[Float]], Int) = tmp.mapPartitions(iter => {
@@ -206,10 +214,9 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 
 		// recover the negative updates, as well as the updates to the vectors
 
-
+		FastMath.vecDotScalar(negUpdate, 1.0f / batchCnt)
+		val bcNegUpdate: Broadcast[Array[Array[Float]]] = modelRDD.sparkContext.broadcast(negUpdate)
 		// shuffle the update of contexts, make it happen.
-
-
 		val updatedDstForJoin: RDD[(Int, HashMapModel)] = tmp.mapPartitions(iter => {
 			val hashMapModel: HashMapModel = iter.next()._4
 			val dstMeta = bcMeta.value.dstMeta
@@ -223,56 +230,27 @@ class GraphEmbedding(val params: Map[String, String]) extends Serializable with 
 				arrayHashMapModel(dstMeta(dstId)).put(dstId, hashMapModel.get(dstId))
 			}
 			arrayHashMapModel.zipWithIndex.toIterator.map(x => (x._2, x._1))
-		})
-
-
-
-//		val updatedDstForJoin: RDD[(Int, HashMapModel)] = tmp.mapPartitions(iter => {
-//			val hashMapModel: HashMapModel = iter.next()._4
-//			val dstMeta = bcMeta.value.dstMeta
-//			val arrayHashMapModel: Array[HashMapModel] = Array.ofDim(numPartititions)
-//			for (i <- 0 until (arrayHashMapModel.length))
-//				arrayHashMapModel(i) = new HashMapModel
-//			val entryIter = hashMapModel.toEntryterator()
-//			while (entryIter.hasNext) {
-//				val entry = entryIter.next()
-//				val dstId = entry.getKey
-//				arrayHashMapModel(dstMeta(dstId)).put(dstId, hashMapModel.get(dstId))
-//			}
-//			arrayHashMapModel.zipWithIndex.toIterator.map(x => (x._2, x._1))
-//		})
-
-		// update the wordEmbeddings
-		modelRDD.join(updatedDstForJoin).mapPartitions(iter => {
-			// one element per partition
-			val (pid, ((srcModel, dstModel), updateDstModel)) = iter.next()
-			val entryIter = updateDstModel.toEntryterator()
-			while (entryIter.hasNext) {
-				val entry = entryIter.next()
-				val dstId = entry.getKey
-				val delta = entry.getValue
-				dstModel.updateAdd(dstId, delta)
-			}
-			Iterator.single(1)
-		}).count // make the update to the context happen
-
-
-		// normalize the negUpdate, and shuffle the negative update: negUpdate
-		FastMath.vecDotScalar(negUpdate, 1.0f / batchCnt)
-		val negHashmapModel = new HashMapModel
-		for (i <- 0 until (negUpdate.length)) {
-			negHashmapModel.put(negDstModel(i)._1, negUpdate(i))
-		}
-		val bcNegHashmapModel = modelRDD.sparkContext.broadcast(negHashmapModel)
-		modelRDD.mapPartitions(iter => {
-			val (pid, (srcModel, dstModel)) = iter.next()
-			val localBcNegHashmapModel = bcNegHashmapModel.value
-			val entryIter = localBcNegHashmapModel.toEntryterator()
-			while (entryIter.hasNext) {
+		}).reduceByKey((x, y) => x.merge(y))
+		// update them
+		modelRDD.zipPartitions(updatedDstForJoin)((iter1, iter2) => {
+			val (pid, (srcModel, dstModel)) = iter1.next()
+			val (pid2, updatedModel) = iter2.next()
+			assert(pid == pid2)
+			val entryIter = updatedModel.toEntryterator()
+			while(entryIter.hasNext){
 				val entry = entryIter.next()
 				val key = entry.getKey
 				val value = entry.getValue
-				if(dstModel.containsKey(key)) {
+				dstModel.updateAdd(key, value)
+			}
+
+			// update the negative update value
+			val localNegUpdate: Array[Array[Float]] = bcNegUpdate.value
+			val localIds: Array[Int] = bcNegArray.value
+			for(i <- 0 until(localIds.length)){
+				val key = localIds(i)
+				val value = localNegUpdate(i)
+				if(dstModel.containsKey(key)){
 					dstModel.updateAdd(key, value)
 				}
 			}

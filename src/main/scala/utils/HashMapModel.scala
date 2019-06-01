@@ -29,5 +29,16 @@ class HashMapModel() extends Serializable {
 			arr(i) += delta(i)
 	}
 
+	def merge(other: HashMapModel): HashMapModel = {
+		if(this.model.size() > other.model.size()){
+			this.model.putAll(other.model)
+			this
+		}
+		else{
+			other.model.putAll(this.model)
+			other
+		}
+	}
+
 	override def toString: String = model.toString
 }
