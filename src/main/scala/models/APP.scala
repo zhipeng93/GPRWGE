@@ -41,6 +41,6 @@ class APP(trainset: RDD[(ChunkDataset, Int)], vertexNum: Int, stopRate: Double)
 			}
 		}
 
-		PairsDataset(src.toArray, dst.toArray)
+		new PairsDataset(src, dst)
 	}
 }

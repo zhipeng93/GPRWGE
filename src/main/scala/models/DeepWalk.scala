@@ -44,6 +44,6 @@ class DeepWalk(trainset: RDD[(ChunkDataset, Int)], vertexNum: Int, windowSize: I
 			}
 		}
 
-		PairsDataset(src.toArray, dst.toArray)
+		new PairsDataset(src, dst)
 	}
 }

@@ -2,7 +2,7 @@ package models
 
 import org.apache.spark.rdd.RDD
 import utils.{ChunkDataset, PairsDataset}
-
+import scala.collection.mutable.ArrayBuffer
 /**
   * The input of "LINE" are "word-context" pairs
   *
@@ -14,12 +14,12 @@ class LINE(trainset: RDD[(ChunkDataset, Int)], vertexNum: Int)
 
   override def generatePairs(chunkDataset: ChunkDataset): PairsDataset = {
     val chunkedArrays = chunkDataset.chunkedArrays
-    val src: Array[Int] = Array.ofDim(chunkDataset.numElements)
-    val dst: Array[Int] = Array.ofDim(chunkDataset.numElements)
+    val src: ArrayBuffer[Int] = new ArrayBuffer(chunkDataset.numElements)
+    val dst: ArrayBuffer[Int] = new ArrayBuffer(chunkDataset.numElements)
     for(i <- 0 until(src.length)){
-      src(i) = chunkedArrays(i)(0)
-      dst(i) = chunkedArrays(i)(1)
+      src(i) += chunkedArrays(i)(0)
+      dst(i) += chunkedArrays(i)(1)
     }
-    PairsDataset(src, dst)
+    new PairsDataset(src, dst)
   }
 }
