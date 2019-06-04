@@ -43,15 +43,15 @@ object Features extends Logging{
 		  * used for efficient sampling/iterating
 		  */
 		val intData: RDD[(ChunkDataset, Int)] = splittedStrings.mapPartitions(iter => {
-			val _dict = bcDict.value
+			val localDict = bcDict.value
 			// build STRING2INT dict
-			val string2id: JHashMap[String, Int] = new JHashMap[String, Int]((_dict.length * 1.5).toInt)
-			for(i <- 0 until(_dict.length)){
-				string2id.put(_dict(i), i)
+			val string2id: JHashMap[String, Int] = new JHashMap[String, Int]((localDict.length * 1.5).toInt)
+			for(i <- 0 until(localDict.length)){
+				string2id.put(localDict(i), i)
 			}
 
 			// parse the dataset into chunked ints
-			val chunkBuffer: ArrayBuffer[ChunkDataset] = new ArrayBuffer[ChunkDataset](100)
+			val chunkBuffer: ArrayBuffer[ChunkDataset] = new ArrayBuffer[ChunkDataset]()
 			var dataId = 0
 			var chunkId = 0
 			chunkBuffer += new ChunkDataset(batchSize)

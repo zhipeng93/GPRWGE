@@ -29,6 +29,11 @@ class HashMapModel() extends Serializable {
 			arr(i) += delta(i)
 	}
 
+	def update(key: Int, value: Array[Float]): Unit ={
+		// we change the value
+		model.replace(key, value)
+	}
+
 	def merge(other: HashMapModel): HashMapModel = {
 		if(this.model.size() > other.model.size()){
 			this.model.putAll(other.model)

@@ -14,11 +14,12 @@ class LINE(trainset: RDD[(ChunkDataset, Int)], vertexNum: Int)
 
   override def generatePairs(chunkDataset: ChunkDataset): PairsDataset = {
     val chunkedArrays = chunkDataset.chunkedArrays
-    val src: ArrayBuffer[Int] = new ArrayBuffer(chunkDataset.numElements)
-    val dst: ArrayBuffer[Int] = new ArrayBuffer(chunkDataset.numElements)
-    for(i <- 0 until(src.length)){
-      src(i) += chunkedArrays(i)(0)
-      dst(i) += chunkedArrays(i)(1)
+    val numElements = chunkDataset.numElements
+    val src: ArrayBuffer[Int] = new ArrayBuffer(numElements)
+    val dst: ArrayBuffer[Int] = new ArrayBuffer(numElements)
+    for(i <- 0 until(numElements)){
+      src += chunkedArrays(i)(0)
+      dst += chunkedArrays(i)(1)
     }
     new PairsDataset(src, dst)
   }

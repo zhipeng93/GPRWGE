@@ -4,6 +4,8 @@ import org.apache.spark.rdd.RDD
 import utils.{ChunkDataset, DistributionMeta, PairsDataset}
 import java.util.Random
 
+import org.apache.spark.internal.Logging
+
 /**
  * base class for samplers of different random walk based models.
  * Functions include:
@@ -13,7 +15,7 @@ import java.util.Random
  * *  Note that when sampling word-context pairs, we do not incur communication.
  */
 
-abstract class BaseModel(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: Int) extends Serializable{
+abstract class BaseModel(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: Int) extends Serializable with Logging{
 
     /**
       * generate a batch of training data given a corpus of training data
@@ -27,7 +29,7 @@ abstract class BaseModel(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: 
             // generate one batch of training data stored in RDD.
             // one element in each partition.
             override def next(): RDD[PairsDataset] = {
-                trainset.mapPartitions{ iter => {
+                trainset.mapPartitions(iter => {
                     var numChunks = -1
                     var chunkDataset: ChunkDataset = null
                     if(iter.hasNext) {
@@ -40,9 +42,8 @@ abstract class BaseModel(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: 
                         chunkIndex -= 1
                         chunkDataset = iter.next()._1
                     }
-                    Iterator(generatePairs(chunkDataset))
-                }
-                }
+                    Iterator.single(generatePairs(chunkDataset))
+                })
 
             }
         }
