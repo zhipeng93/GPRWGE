@@ -1,7 +1,7 @@
-package models
+package samplers
 
 import org.apache.spark.rdd.RDD
-import utils.{ChunkDataset, DistributionMeta, PairsDataset}
+import ge.basics.{ChunkDataset, DistributionMeta, PairsDataset}
 import java.util.Random
 
 import org.apache.spark.internal.Logging
@@ -15,7 +15,7 @@ import org.apache.spark.internal.Logging
  * *  Note that when sampling word-context pairs, we do not incur communication.
  */
 
-abstract class BaseModel(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: Int) extends Serializable with Logging{
+abstract class BaseSampler(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: Int) extends Serializable with Logging{
 
     /**
       * generate a batch of training data given a corpus of training data
@@ -44,7 +44,6 @@ abstract class BaseModel(val trainset: RDD[(ChunkDataset, Int)], val vertexNum: 
                     }
                     Iterator.single(generatePairs(chunkDataset))
                 })
-
             }
         }
     }

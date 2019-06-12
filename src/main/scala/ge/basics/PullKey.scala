@@ -1,4 +1,4 @@
-package utils
+package ge.basics
 
 import scala.collection.mutable.ArrayBuffer
 

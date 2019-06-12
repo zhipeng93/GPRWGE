@@ -7,6 +7,7 @@ import java.util.{HashMap => JHashMap}
 
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
+import ge.basics.ChunkDataset
 
 /**
   * This class provide some feature pre-processing utils for input data.

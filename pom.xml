@@ -12,6 +12,7 @@
         <scala.version>2.11.8</scala.version>
         <scala.compat.version>2.11</scala.compat.version>
         <spark.version>2.3.0</spark.version>
+        <sparkonangel.version>2.2.0</sparkonangel.version>
     </properties>
 
     <repositories>
@@ -47,6 +48,24 @@
             <artifactId>spark-mllib_${scala.compat.version}</artifactId>
             <version>${spark.version}</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.tencent.angel/spark-on-angel-core -->
+        <dependency>
+            <groupId>com.tencent.angel</groupId>
+            <artifactId>spark-on-angel-core</artifactId>
+            <version>${sparkonangel.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.tencent.angel</groupId>
+            <artifactId>angel-ps-core</artifactId>
+            <version>${sparkonangel.version}</version>
+        </dependency>
+
+        <!--<dependency>-->
+            <!--<groupId>com.tencent.angel</groupId>-->
+            <!--<artifactId>spark-on-angel-mllib</artifactId>-->
+            <!--<version>${sparkonangel.version}</version>-->
+        <!--</dependency>-->
+
     </dependencies>
 
     <build>

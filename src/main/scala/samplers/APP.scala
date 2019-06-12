@@ -1,7 +1,7 @@
-package models
+package samplers
 
 import org.apache.spark.rdd.RDD
-import utils.{ChunkDataset, PairsDataset}
+import ge.basics.{ChunkDataset, PairsDataset}
 import java.util.Random
 
 import scala.collection.mutable.ArrayBuffer
@@ -12,7 +12,7 @@ import scala.collection.mutable.ArrayBuffer
   * @param vertexNum
   */
 class APP(trainset: RDD[(ChunkDataset, Int)], vertexNum: Int, stopRate: Double)
-	extends BaseModel(trainset, vertexNum) {
+	extends BaseSampler(trainset, vertexNum) {
 
 	/**
 	  * input a list of sentences, output the positive word-context pairs

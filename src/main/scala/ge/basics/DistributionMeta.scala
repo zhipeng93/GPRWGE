@@ -1,4 +1,4 @@
-package utils
+package ge.basics
 
 /**
   * class for distribution of each embeddings vector.

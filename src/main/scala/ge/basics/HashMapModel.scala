@@ -1,4 +1,4 @@
-package utils
+package ge.basics
 
 import java.util.Map.Entry
 import java.util.{HashMap => JHashMap}
@@ -29,6 +29,13 @@ class HashMapModel() extends Serializable {
 			arr(i) += delta(i)
 	}
 
+	def updateSub(key: Int, delta: Array[Float]): Unit ={
+		// we incur in-place add
+		val arr = get(key)
+		for(i <- 0 until(arr.length))
+			arr(i) -= delta(i)
+	}
+
 	def update(key: Int, value: Array[Float]): Unit ={
 		// we change the value
 		model.replace(key, value)
@@ -45,5 +52,6 @@ class HashMapModel() extends Serializable {
 		}
 	}
 
-	override def toString: String = model.toString
+	override def clone(): AnyRef = super.clone()
+
 }

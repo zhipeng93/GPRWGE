@@ -1,7 +1,7 @@
-package models
+package samplers
 
 import org.apache.spark.rdd.RDD
-import utils.{ChunkDataset, PairsDataset}
+import ge.basics.{ChunkDataset, PairsDataset}
 import scala.collection.mutable.ArrayBuffer
 /**
   * The input of "LINE" are "word-context" pairs
@@ -10,7 +10,7 @@ import scala.collection.mutable.ArrayBuffer
   * @param vertexNum
   */
 class LINE(trainset: RDD[(ChunkDataset, Int)], vertexNum: Int)
-  extends BaseModel(trainset, vertexNum){
+  extends BaseSampler(trainset, vertexNum){
 
   override def generatePairs(chunkDataset: ChunkDataset): PairsDataset = {
     val chunkedArrays = chunkDataset.chunkedArrays

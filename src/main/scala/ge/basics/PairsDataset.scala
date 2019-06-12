@@ -1,4 +1,4 @@
-package utils
+package ge.basics
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -7,7 +7,7 @@ import scala.collection.mutable.ArrayBuffer
   * @param src
   * @param dst
   */
-class PairsDataset(val src: ArrayBuffer[Int], val dst: ArrayBuffer[Int]){
+class PairsDataset(val src: ArrayBuffer[Int], val dst: ArrayBuffer[Int]) extends Serializable {
 
 	def merge(other: PairsDataset): PairsDataset ={
 		if(this.src.size > other.src.size) {

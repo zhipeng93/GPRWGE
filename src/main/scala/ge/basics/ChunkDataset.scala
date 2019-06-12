@@ -1,11 +1,11 @@
-package utils
+package ge.basics
 
 /**
   * chunked dataset for efficient sampling in Spark's iterator-based scanning
   * chunk-size can be set as batch size.
   * @param chunkSize
   */
-class ChunkDataset(chunkSize: Int){
+class ChunkDataset(chunkSize: Int) extends Serializable {
 	val chunkedArrays: Array[Array[Int]] = new Array[Array[Int]](chunkSize)
 	var numElements = 0
 

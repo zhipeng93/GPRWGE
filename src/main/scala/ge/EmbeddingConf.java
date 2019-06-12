@@ -1,8 +1,6 @@
-package utils;
+package ge;
 
-import java.io.Serializable;
-
-public class EmbeddingConf implements Serializable {
+public class EmbeddingConf {
   // possible values of each option is included in []
 
   // path of training data
@@ -26,5 +24,14 @@ public class EmbeddingConf implements Serializable {
   // the stop probablity in rooted pagerank. The bigger, the longer the path is.
   public static final String STOPRATE = "STOPRATE"; //[0.5]
   public static final String SAMPLERNAME = "SAMPLER"; // [rootedPageRank,]
+
+  public static final String FEATURES = "FEATURES";
+  public static final String LABELS = "LABELS";
+
+  public static final String PLATFORM = "PLATFORM";
+
+  // ps parameters
+  public static String NUMNODEPERROW = "NUMNODEPERROW";
+  public static String NUMPARTS = "NUMPARTS";
 
 }
