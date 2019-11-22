@@ -38,7 +38,7 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 			val srcModel: HashMapModel = iter2.next()._2
 
 			// get negative sampling nodes
-			val random: Random = new Random()
+			val random: Random = new Random(iterationId)
 			val negArray: Array[Int] = Array.ofDim(negative)
 			for (i <- 0 until (negArray.length)) {
 				negArray(i) = random.nextInt(vertexNum)
@@ -52,6 +52,7 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 			for(i <- 0 until(dstIds.length)){
 				indicesSet.add(dstIds(i))
 			}
+			logInfo(s"*ghand*dstIds.length:${dstIds.length}")
 			val indices: Array[Int] = indicesSet.toIntArray()
 
 			startTime = System.currentTimeMillis()
@@ -64,7 +65,7 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 				.asInstanceOf[GEPullResult]
 
 			endTime = System.currentTimeMillis()
-			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pulls model " +
+			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pulls ${indices.length} vectors " +
 				s"from PS, takes ${(endTime - startTime) / 1000.0} seconds.")
 
 			startTime = System.currentTimeMillis()
@@ -105,7 +106,7 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 					indices, deltas, numNodePerRow, dimension)))
 				.get()
 			endTime = System.currentTimeMillis()
-			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pushes model " +
+			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pushes ${indices.length} vectors " +
 				s"to PS, takes ${(endTime - startTime) / 1000.0} seconds.")
 
 			// push back and compute loss

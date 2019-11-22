@@ -52,6 +52,16 @@ class HashMapModel() extends Serializable {
 		}
 	}
 
-	override def clone(): AnyRef = super.clone()
+	def deepCopy(): HashMapModel = {
+		val result: HashMapModel = new HashMapModel
+		val entryIter = this.toEntryterator
+		while(entryIter.hasNext){
+			val entry = entryIter.next()
+			val key: Int = entry.getKey
+			val value: Array[Float] = entry.getValue
+			result.put(key, value)
+		}
+		result
+	}
 
 }

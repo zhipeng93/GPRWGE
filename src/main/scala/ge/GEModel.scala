@@ -79,6 +79,7 @@ class GEPSModel (sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta],
 	val srcModel: RDD[(Int, HashMapModel)] = {
 		val trainSet = sampler.trainset
 		val model: RDD[(Int, HashMapModel)] = {
+			// should be barrier mode, because data rdd is barrier mode.
 			trainSet.mapPartitionsWithIndex((pid, iter) => {
 				val srcMeta: Array[Int] = bcMeta.value.srcMeta
 

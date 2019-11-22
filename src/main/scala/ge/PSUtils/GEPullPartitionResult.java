@@ -35,7 +35,7 @@ public class GEPullPartitionResult extends PartitionGetResult {
     }
 
     public void merge(float[] results) {
-        int offset = start * dimension * 2;
+        int offset = start * dimension;
         for (int a = 0; a < length; a ++)
             results[a + offset] = buf.readFloat();
     }

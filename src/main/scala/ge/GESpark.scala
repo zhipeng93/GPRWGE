@@ -51,9 +51,10 @@ class GESpark(params: Map[String, String]) extends GraphEmbedding(params: Map[St
 		}).groupByKey(numPartititions)
 
 		/* get the dstModels from each server Id, organize them according to the partition id*/
-		val dstModelForJoin: RDD[(Int, HashMapModel)] = dstKeys.zipPartitions(srcDstModel)((iter1, iter2) => {
-			val (pid, keys): (Int, Iterable[PullKey]) = iter1.next()
-			val (mid, (srcModel, dstModel)): (Int, (HashMapModel, HashMapModel)) = iter2.next()
+		/* use large to zip with small. */
+		val dstModelForJoin: RDD[(Int, HashMapModel)] = srcDstModel.zipPartitions(dstKeys)((iter1, iter2) => {
+			val (pid, keys): (Int, Iterable[PullKey]) = iter2.next()
+			val (mid, (srcModel, dstModel)): (Int, (HashMapModel, HashMapModel)) = iter1.next()
 			val modelsToSend: Array[HashMapModel] = Array.ofDim(numPartititions)
 			for(i <- 0 until(modelsToSend.length)){
 				modelsToSend(i) = new HashMapModel
@@ -83,7 +84,7 @@ class GESpark(params: Map[String, String]) extends GraphEmbedding(params: Map[St
 					negArray(i) = random.nextInt(vertexNum)
 				}
 				// clone is deepcopy
-				val netDstModelBackup: HashMapModel = netDstModel.clone().asInstanceOf[HashMapModel]
+				val netDstModelBackup: HashMapModel = netDstModel.deepCopy()
 				val sharedNegUpdate: Array[Array[Float]] = Array.ofDim(negative, dimension)
 				for(i <- 0 until(negative)){
 					sharedNegUpdate(i) = Array.ofDim(dimension)
@@ -117,7 +118,9 @@ class GESpark(params: Map[String, String]) extends GraphEmbedding(params: Map[St
 				}
 				Iterator.single((loss, srcIds.length, netDstModel))
 			})
-
+		// cache the tmp RDD
+		tmp.cache()
+		tmp.setName("loss_model_updates")
 		// deal with the loss
 		val (batchLoss, batchCnt): (Float, Int) = tmp.mapPartitions(iter => {
 			// one element per partition
@@ -141,6 +144,9 @@ class GESpark(params: Map[String, String]) extends GraphEmbedding(params: Map[St
 			}
 			arrayHashMapModel.zipWithIndex.toIterator.map(x => (x._2, x._1))
 		}).reduceByKey((x, y) => x.merge(y))
+
+		// unpersist the tmp RDD
+		tmp.unpersist()
 		// update them
 		srcDstModel.zipPartitions(updatedDstForJoin)((iter1, iter2) => {
 			val (pid, (srcModel, dstModel)) = iter1.next()

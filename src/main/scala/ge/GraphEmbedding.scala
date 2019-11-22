@@ -32,7 +32,10 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 	  */
 	def loadData(sparkContext: SparkContext): (RDD[(ChunkDataset, Int)], Broadcast[Array[String]], Int) = {
 		val numCores = SparkUtils.getNumCores(sparkContext.getConf)
-		val textFile = sparkContext.textFile(input, minPartitions = numCores * 2)
+		// coalesce does not support barrier mode.
+		// The reason given by mengxr is "when shuffle is false,
+		// it may lead to different number of partitions"
+		val textFile = sparkContext.textFile(input, minPartitions = numCores).repartition(numCores)
 		Features.corpusStringToChunkedIntWithRemapping(textFile, batchSize)
 	}
 
@@ -53,12 +56,12 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 	def shuffleDataBySource(batchData: RDD[PairsDataset], bcMeta: Broadcast[DistributionMeta]): RDD[(Int, PairsDataset)] = {
 
 		val numPartititions = batchData.getNumPartitions
-		batchData.mapPartitionsWithIndex((thisPid, iter) => {
+		// use barrier mode for rdd data generating.
+		batchData.mapPartitions(iter => {
 			// one batch contains only one PairsDataset
 			val pairsDataset = iter.next()
 			val dSrc = pairsDataset.src
 			val dDst = pairsDataset.dst
-			logInfo(s"*ghand*number of data in each partition: ${dSrc.size}")
 
 			val srcMeta: Array[Int] = bcMeta.value.srcMeta
 			// for partition the training data
@@ -114,23 +117,27 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 		val bcMeta = sparkContext.broadcast(meta)
 		val geModel: GEModel = initModel(sampler, bcMeta)
 
-		val batchIter = sampler.batchIterator()
+		val batchIter = sampler.batchIterator() // barrierRDD.
 		val trainStart = System.currentTimeMillis()
 		for (epochId <- 0 until (numEpoch)) {
 			var trainedLoss = 0.0
 			var trainedPairs = 0
 			var batchId = 0
 			while (batchId < numChunks) {
-				val batchData: RDD[PairsDataset] = batchIter.next()
+				val batchData: RDD[PairsDataset] = batchIter.next() // barrierRDD
 				val shuffledData = shuffleDataBySource(batchData, bcMeta)
-				shuffledData.cache()
+//				shuffledData.cache()
 				val (batchLoss, batchCnt) = train(shuffledData, bcMeta, geModel, vertexNum, batchId)
-				shuffledData.unpersist()
+//				shuffledData.unpersist()
 				trainedLoss += batchLoss
 				trainedPairs += batchCnt
 				batchId += 1
+				logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
+					s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
+
 			}
-			logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} loss:${trainedLoss / trainedPairs}")
+			logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
+				s"loss:${trainedLoss / trainedPairs}")
 
 			if (((epochId + 1) % checkpointInterval) == 0) {
 				// checkpoint the model
@@ -138,7 +145,8 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 				geModel.saveDstModel(output + "_dst_" + epochId, bcDict)
 			}
 		}
-		logInfo(s"*ghand* training ${numEpoch} epochs takes: ${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
+		logInfo(s"*ghand* training ${numEpoch} epochs takes: " +
+			s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
 		geModel.destory()
 	}
 

@@ -1,6 +1,6 @@
 package apps
 
-import ge.{GEPS, GESpark, EmbeddingConf}
+import ge.{EmbeddingConf, GEPS, GESpark}
 import utils.ArgsUtil
 
 object Main{
@@ -10,6 +10,7 @@ object Main{
 		platForm match{
 			case "SPARK" => new GESpark(params).run()
 			case "PS" => new GEPS(params).run()
+			case "SPARK_ANALYSIS" => new GESpark(params).run()
 			case _ => new GESpark(params).run()
 		}
 

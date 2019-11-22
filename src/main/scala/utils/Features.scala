@@ -1,6 +1,6 @@
 package utils
 
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{RDD, RDDBarrier}
 
 import scala.collection.mutable.ArrayBuffer
 import java.util.{HashMap => JHashMap}
@@ -43,7 +43,8 @@ object Features extends Logging{
 		  * it is the number of trunks in this partition.
 		  * used for efficient sampling/iterating
 		  */
-		val intData: RDD[(ChunkDataset, Int)] = splittedStrings.mapPartitions(iter => {
+		// lanuch all of them together, for ml locality.
+		val intData: RDD[(ChunkDataset, Int)] = splittedStrings.barrier().mapPartitions(iter => {
 			val localDict = bcDict.value
 			// build STRING2INT dict
 			val string2id: JHashMap[String, Int] = new JHashMap[String, Int]((localDict.length * 1.5).toInt)
